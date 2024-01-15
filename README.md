@@ -23,8 +23,11 @@ IEMOCAP
         |- ...
   |-...
 
-To reorganize the IEMOCAP dataset, run: python reorganize_dataset.py --dataset_name IEMOCAP --source_path "DIR" --target_path "./data/IEMOCAP"
 
+To reorganize the IEMOCAP dataset, run: 
+```
+python reorganize_dataset.py --dataset_name IEMOCAP --source_path "DIR" --target_path "./data/IEMOCAP"
+```
 For CREMA-D:
 ```
 python reorganize_dataset.py --dataset_name CREMA-D --source_path "DIR" --target_path "./data/CREMA-D"
