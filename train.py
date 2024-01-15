@@ -311,9 +311,9 @@ class CycleGANTraining(object):
             testing_start_time = time.time()
 
             #self.testing(self.generator, "angry", "neutral", self.start_epoch - 1, 0)
-            self.testing(self.generator, "neutral", "angry", self.start_epoch - 1, 0)
-            self.testing(self.generator, "neutral", "happy", self.start_epoch - 1, 0)
-            self.testing(self.generator, "neutral", "sad", self.start_epoch - 1, 0)
+            #self.testing(self.generator, "neutral", "angry", self.start_epoch - 1, 0)
+            #self.testing(self.generator, "neutral", "happy", self.start_epoch - 1, 0)
+            #self.testing(self.generator, "neutral", "sad", self.start_epoch - 1, 0)
 
             testing_end_time = time.time()
 
@@ -528,7 +528,7 @@ class CycleGANTraining(object):
                     testing_start_time = time.time()
 
                     self.testing(self.generator, "neutral", "angry", epoch, num_iterations)  # testing A
-                    self.testing(self.generator, "angry", "neutral", epoch, num_iterations)  # testing B
+                    #self.testing(self.generator, "angry", "neutral", epoch, num_iterations)  # testing B
 
                     testing_end_time = time.time()
                     store_to_file = "Time taken for testing Set: {}".format(
@@ -587,8 +587,8 @@ class CycleGANTraining(object):
             ) / self.sps_stats["std"]
 
             log_norm_f0 = (
-                np.log(f0 + 1e-10) - self.logf0_stats["mean"]
-            ) / self.logf0_stats["std"]
+                np.log(f0 + 1e-10) - self.logf0_stats_emo[source_emo]["mean"]
+            ) / self.logf0_stats_emo[source_emo]["std"]
 
             input = np.concatenate(
                 (coded_sp_norm, np.expand_dims(log_norm_f0, axis=0)), axis=0
@@ -637,8 +637,8 @@ class CycleGANTraining(object):
             )
             
             if not self.use_f0_model:
-                f0_converted = log_norm_f0 * self.logf0_stats_emo[target_emo]["std"] + self.logf0_stats_emo[target_emo]["mean"]
-                f0_converted = np.exp(f0_converted)
+                f0_converted_n = log_norm_f0 * self.logf0_stats_emo[target_emo]["std"] + self.logf0_stats_emo[target_emo]["mean"]
+                f0_converted_n = np.exp(f0_converted_n)
             
 
             f0_min, f0_max = 60, 500 
@@ -646,7 +646,7 @@ class CycleGANTraining(object):
             f0_smoothed = smooth_f0(f0_converted_clamped, window_size=5)
             
             wav_transformed = preprocess.world_speech_synthesis(
-                f0=f0_smoothed,
+                f0=f0_converted,
                 decoded_sp=decoded_sp_converted,
                 ap=ap,
                 fs=self.sampling_rate,
@@ -665,7 +665,8 @@ class CycleGANTraining(object):
             plt.plot(f0, label="original")
             plt.xlabel("Time")
             plt.ylabel("Frequency")
-            plt.plot(f0_smoothed, label="converted")
+            plt.plot(f0_converted, label="model convertion")
+            plt.plot(f0_converted_n, label="normalization convertion")
             plt.legend()
             
             plt.savefig(os.path.join(output_dir, str(epoch) + "_" + str(num_iterations) + os.path.basename(file) + "_f0.png"))
@@ -925,15 +926,14 @@ class CycleGANTraining(object):
 
 
         for emotion in self.emotions:
-            logf0_norm_file = os.path.join(cache_folder, f"logf0s_{emotion}_normalization.npz")
-            if os.path.exists(logf0_norm_file):
-                logf0_norm_data = np.load(logf0_norm_file)
-                logf0_stats[emotion]["mean"] = logf0_norm_data["mean"]
-                logf0_stats[emotion]["std"] = logf0_norm_data["std"]
+            logf0_norm_file_emo = os.path.join(cache_folder, f"logf0s_{emotion}_normalization.npz")
+            if os.path.exists(logf0_norm_file_emo):
+                logf0_norm_data_emo = np.load(logf0_norm_file_emo)
+                logf0_stats_emo[emotion]["mean"] = logf0_norm_data_emo["mean"]
+                logf0_stats_emo[emotion]["std"] = logf0_norm_data_emo["std"]
             else:
                 raise FileNotFoundError(
-                    f"logf0 normalization file for {emotion} not found at {logf0_norm_file}"
-                )
+                    f"logf0 normalization file for {emotion} not found at {logf0_norm_file_emo}")
 
         return logf0_stats, mcep_stats, logf0_stats_emo
 
@@ -944,7 +944,7 @@ if __name__ == "__main__":
     )
 
     config_file = "./config.yaml"
-    resume_training_at = './model_checkpoint/Classifier_alldatasets_SeperatePathwayGenerator2/9_48000_CycleGAN_CheckPoint'
+    resume_training_at = None
 
 
     parser.add_argument(
@@ -954,7 +954,7 @@ if __name__ == "__main__":
         default=config_file,
     )
     parser.add_argument(
-        "--resume_training_at",
+        "--resume_training",
         type=str,
         help="Location of the pre-trained model to resume training",
         default=resume_training_at,
@@ -962,7 +962,7 @@ if __name__ == "__main__":
 
     argv = parser.parse_args()
     config_file = argv.config_file
-    resume_training_at = argv.resume_training_at
+    resume_training_at = argv.resume_training
 
     cycleGAN = CycleGANTraining(
         config_file=config_file, restart_training_at=resume_training_at

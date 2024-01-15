@@ -2,6 +2,7 @@ import soundfile as sf
 import numpy as np
 import os
 import shutil
+import argparse
 
 
 def convert_to_int16(directory):
@@ -243,10 +244,59 @@ def combine_emotions_from_datasets(data_dir, combined_dir, datasets, emotions):
 if __name__ == "__main__":
     print("Converting...")
 
-    source_path = "./Emotion_conversion/data"
-    target_path = "./Emotion_conversion/data/combined_emotion_folder"
-
     datasets = ["CREMA-D", "EmoDB", "EmoV-DB", "IEMOCAP_test", "RAVDESS"]
     emotions = ["angry", "sad", "neutral", "happy"]
 
-    combine_emotions_from_datasets(source_path, target_path, datasets, emotions)
+
+    parser = argparse.ArgumentParser(
+        description="Preprocesses the training data for the Voice Conversion Model"
+    )
+
+    config_file = "./config.yaml"
+
+    parser.add_argument(
+        "--dataset_name",
+        type=str,
+        help="Name of the dataset to preprocess",
+        default=None,
+    )
+    
+    parser.add_argument(
+        "--source_path",
+        type=str,
+        help="Path to the dataset",
+        default=None,
+    )
+    
+    parser.add_argument(
+        "--target_path",
+        type=str,
+        help="Path to the dataset",
+        default=None,
+    )
+
+    argv = parser.parse_args()
+    dataset_name = argv.dataset_name
+    source_path = argv.source_path
+    target_path = argv.target_path
+    
+    if not os.path.exists(target_path):
+        os.makedirs(target_path)
+    
+    
+    match dataset_name:
+        case "CREMA-D":
+            organize_CREMA_D_by_emotion(source_path, target_path)
+        case "EmoDB":
+            organize_emodb_by_emotion(source_path, target_path)
+        case "EmoV-DB":
+            reorganize_emov_db_by_emotion(source_path, target_path)
+        case "IEMOCAP":
+            organize_iemocap_by_emotion(source_path, target_path)
+        case "RAVDESS":
+            organize_ravdess_by_emotion(source_path, target_path)
+        case "combine":
+            combine_emotions_from_datasets(source_path, target_path, datasets, emotions)
+            
+
+    
