@@ -26,6 +26,8 @@ from GAN.generator_model import (
     SeperatePathwayGenerator,
     CombinedTransformerGenerator,
 )
+
+from utils_solver import TrackLosses, CustomLRScheduler, smooth_f0
 from GAN.classifier import Classifier
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
@@ -34,88 +36,11 @@ from torch.cuda.amp import GradScaler, autocast
 import matplotlib.pyplot as plt
 
 
-os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
+#os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 
 
 
-
-
-
-
-
-def smooth_f0(f0, window_size=5):
-    """
-    Smooths the F0 contour using a moving average filter.
-    
-    Parameters:
-    f0 (numpy array): The F0 contour array.
-    window_size (int): The size of the moving average window. Must be an odd integer.
-    
-    Returns:
-    numpy array: The smoothed F0 contour.
-    """
-    if window_size % 2 == 0:
-        raise ValueError("Window size must be an odd integer")
-
-    half_window = window_size // 2
-    f0_padded = np.pad(f0, (half_window, half_window), mode='reflect')
-    f0_smooth = np.convolve(f0_padded, np.ones(window_size) / window_size, mode='valid')
-
-    return f0_smooth
-
-
-
-
-class TrackLosses:
-    def __init__(self, loss_names):
-        self.loss_names = loss_names
-        self.losses = {loss_name: [] for loss_name in loss_names}
-
-    def __getitem__(self, loss_name):
-        return self.losses[loss_name]
-
-    def update(self, loss_values):
-        for loss_name, loss_value in zip(self.loss_names, loss_values):
-            self.losses[loss_name].append(loss_value)
-
-    def reset(self):
-        for loss_name in self.loss_names:
-            self.losses[loss_name] = []
-
-    def get_last_average(self, loss_name, n=50):
-        return np.mean(self.losses[loss_name][-n:])
-
-    def plot(self, save_path=None):
-        for loss_name in self.loss_names:
-            plt.plot(self.losses[loss_name], label=loss_name)
-        plt.legend()
-        if save_path is not None:
-            plt.savefig(save_path)
-        plt.show()
-
-
-class CustomLRScheduler:
-    def __init__(self, optimizer, base_lr, decay_factor, num_steps, min_lr):
-        self.optimizer = optimizer
-        self.base_lr = base_lr
-        self.decay_factor = decay_factor
-        self.num_steps = num_steps
-        self.current_step = 0
-        self.min_lr = min_lr
-
-    def step(self):
-        self.current_step += 1
-        lr = self.base_lr * (self.decay_factor ** (self.current_step / self.num_steps))
-        for param_group in self.optimizer.param_groups:
-            param_group["lr"] = max(
-                lr, self.min_lr
-            )  # Ensure lr doesn't go below a threshold
-
-    def reset(self):
-        self.current_step = 0
-        for param_group in self.optimizer.param_groups:
-            param_group["lr"] = self.base_lr
 
 
 
@@ -300,12 +225,13 @@ class CycleGANTraining(object):
             drop_last=False,
         )
 
-        if self.configs["SOLVER"]["TRAIN_CLASSIFIER"] == True:
+
+        if self.load_classifier() == False:
             self.train_classifier(train_loader)
         else:
-            self.load_classifier()
+            print("Classifier loaded")
 
-        if True:
+        if False:
             # testing Set
             print("Generating testing... ,epoch ", self.start_epoch - 1)
             testing_start_time = time.time()
@@ -317,10 +243,7 @@ class CycleGANTraining(object):
 
             testing_end_time = time.time()
 
-            store_to_file = "Time taken for testing Set: {}".format(
-                testing_end_time - testing_start_time
-            )
-            self.store_to_file(store_to_file)
+
             print(
                 "Time taken for testing Set: {}".format(
                     testing_end_time - testing_start_time
@@ -467,7 +390,7 @@ class CycleGANTraining(object):
                     )
                     print(description, end="\r", flush=True)
 
-                if num_iterations % self.configs["SOLVER"]["LOG_TS_BOARD_INTERVAL"] == 0:
+                if (num_iterations + 1) % self.configs["SOLVER"]["LOG_TS_BOARD_INTERVAL"] == 0:
                     train_metrics = {
                         "losses/av_d_loss": "d_loss",
                         "losses/av_g_loss": "g_loss",
@@ -502,12 +425,8 @@ class CycleGANTraining(object):
                 #        self.discriminator_optimizer, name="discriminator"
                 #    )
 
-                if num_iterations % 2000 == 0: #epoch % self.configs["SOLVER"]["CHECKPOINT_INTERVAL"] == 0:
+                if (num_iterations + 1) % 2000 == 0: #epoch % self.configs["SOLVER"]["CHECKPOINT_INTERVAL"] == 0:
                     end_time = time.time()
-                    store_to_file = "Epoch: {} Generator Loss: {:.4f} Discriminator Loss: {}, Time: {:.2f}\n\n".format(
-                        epoch, g_loss.item(), d_loss.item(), end_time - start_time_epoch
-                    )
-                    self.store_to_file(store_to_file)
                     print(
                         "Epoch: {} Generator Loss: {:.4f} Discriminator Loss: {}, Time: {:.2f}".format(
                             epoch, g_loss.item(), d_loss.item(), end_time - start_time_epoch
@@ -515,15 +434,13 @@ class CycleGANTraining(object):
                     )
 
                     # Save the Entire model
-                    store_to_file = "Saving model Checkpoint  ......"
-                    self.store_to_file(store_to_file)
                     file_path = os.path.join(
                         self.modelCheckpoint, "{}_{}_CycleGAN_CheckPoint".format(epoch, num_iterations)
                     )
                     self.saveModelCheckPoint(epoch, file_path)
                     print("Model Saved!")
 
-                if num_iterations % 2000 == 0: #epoch % self.configs["SOLVER"]["TESTING_INTERVAL"] == 0:
+                if (num_iterations + 1) % 2000 == 0: #epoch % self.configs["SOLVER"]["TESTING_INTERVAL"] == 0:
                     print("Generating testing...")
                     testing_start_time = time.time()
 
@@ -531,21 +448,16 @@ class CycleGANTraining(object):
                     #self.testing(self.generator, "angry", "neutral", epoch, num_iterations)  # testing B
 
                     testing_end_time = time.time()
-                    store_to_file = "Time taken for testing Set: {}".format(
-                        testing_end_time - testing_start_time
-                    )
-                    self.store_to_file(store_to_file)
-                    print(
-                        "Time taken for testing Set: {}".format(
-                            testing_end_time - testing_start_time
-                        )
-                    )
+
             print(description)
 
         print("Training finished")
 
         self.writer_validation.close()
         self.writer_train.close()
+
+
+
 
     def testing(self, model, source_emo, target_emo, epoch, num_iterations):
         model.eval()
@@ -730,11 +642,14 @@ class CycleGANTraining(object):
 
     def load_classifier(self):
         classifier_checkpoint = self.configs["SOLVER"]["CHECKPOINT_DIR_CLASSIFIER"]
-        os.path.join(classifier_checkpoint, f"classifier_epoch_{5}.pth")
-        classifier_checkpoint = "./model_checkpoint/classifier/classifier_epoch_5.pth"
+        classifier_checkpoint = os.path.join(classifier_checkpoint, f"classifier_epoch_{5}.pth")
+
+        if not os.path.isfile(classifier_checkpoint):
+            return False
 
         checkPoint = torch.load(classifier_checkpoint, map_location=self.device)
         self.classifier.load_state_dict(state_dict=checkPoint["model_state_dict"])
+        return True  
 
     def calculate_val_error(self, val_loader):
         self.generator.eval()  # Set the generators to evaluation mode
@@ -844,10 +759,6 @@ class CycleGANTraining(object):
             config = yaml.safe_load(file)
         return config
 
-    def store_to_file(self, doc):
-        doc = doc + "\n"
-        with open(self.file_name, "a") as myfile:
-            myfile.write(doc)
 
     def saveModelCheckPoint(self, epoch, PATH):
         torch.save(

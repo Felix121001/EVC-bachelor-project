@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from GAN.utils import (
+from GAN.utils_modules import (
     GLU,
     GatedLinearUnit,
     PixelShuffle,

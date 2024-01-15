@@ -22,7 +22,7 @@ import yaml
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 import librosa
-from GAN.utils import safe_coded_spectrogram, save_2d_vector_as_image, safe_spectrogram
+from GAN.utils_modules import safe_coded_spectrogram, save_2d_vector_as_image
 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
@@ -81,14 +81,14 @@ class DiffusionModel(nn.Module):
         else:
             print("No checkpoint file found to load.")
 
-    def generate_noise(self, key, x_0, t, noise_factor=0.5):
+    def generate_noise(self, key, x_0, t):
         torch.manual_seed(key)
         noise = torch.randn_like(x_0, device=self.device)
         reshaped_sqrt_alpha_bar_t = (
-            self.sqrt_alpha_bar[t].view(-1, 1, 1, 1) * (1 - noise_factor) * 2
+            self.sqrt_alpha_bar[t].view(-1, 1, 1, 1) 
         )
         reshaped_one_minus_sqrt_alpha_bar_t = (
-            self.one_minus_sqrt_alpha_bar[t].view(-1, 1, 1, 1) * noise_factor * 2
+            self.one_minus_sqrt_alpha_bar[t].view(-1, 1, 1, 1)
         )
         noisy_image = (
             reshaped_sqrt_alpha_bar_t * x_0
@@ -146,7 +146,7 @@ class DiffusionPipeline:
         self.num_classes = len(self.emotions)
 
         self.n_frames = self.configs["INPUT"]["N_FRAMES"]
-        self.sp_dim = self.configs["INPUT"]["SP_DIM"]
+        self.num_mcep = self.configs["INPUT"]["NUM_MCEP"]
         self.sampling_rate = self.configs["INPUT"]["SAMPLING_RATE"]
         self.frame_period = self.configs["INPUT"]["FRAME_PERIOD"]
 
@@ -164,7 +164,7 @@ class DiffusionPipeline:
             self.num_classes,
             self.class_emb_dim,
             self.channels,
-            self.sp_dim,
+            self.num_mcep + 1,
             self.n_frames,
             self.ckpt_path,
             self.device,
@@ -188,10 +188,11 @@ class DiffusionPipeline:
         self.writer_test = SummaryWriter(validation_directory)
 
     def train(self):
-        self.testing("angry", "neutral", 0)
+
+        #self.testing("angry", "neutral", 0)
+        
         comb_losses = []
         for epoch in range(self.start_epoch, self.epochs):
-            
             pbar = tqdm(
                 total=len(self.train_loader),
                 desc="Epoch {}".format(epoch),
@@ -199,31 +200,18 @@ class DiffusionPipeline:
             )
             losses = []
             for i, (batch, _class) in enumerate(self.train_loader):
-                if i == 0: print("batch", batch.shape)
                 
                 batch = batch.to(self.device)
-                batch = batch[:,:self.sp_dim,:]
                 _class = _class.to(self.device)
                 if len(batch.shape) == 3:
                     batch = batch.unsqueeze(1)
 
-                loss = self.train_step(batch, _class)
+                loss, sp = self.train_step(batch, _class)
                 losses.append(loss)
 
                 if i % 10 == 0:
-                    description = f"Epoch {epoch+1}/{self.epochs}, Iter{i}/{len(self.train_loader)} | Loss: {loss}"
+                    description = f"Epoch {epoch+1}/{self.epochs} | Loss: {loss}"
                     pbar.set_description(description)
-                    
-                if (i + 1) % 200 == 0:
-                    torch.save(
-                        {
-                            "epoch": epoch,
-                            "model_state_dict": self.model.unet.state_dict(),
-                            "optimizer_state_dict": self.optimizer.state_dict(),
-                        },
-                        os.path.join(self.ckpt_path, f"ckpt_test_{epoch+1}_{i}.pth"),
-                    )
-                    print("Model saved successfully.")                    
 
                 if (i + 1) % 200 == 0:
                     self.writer_train.add_scalar(
@@ -233,19 +221,22 @@ class DiffusionPipeline:
                         ).item(),
                         epoch * len(self.train_loader) + i,
                     )
-                    ind = epoch * len(self.train_loader) + i
                     self.validate(
-                        epoch, indx=ind, log=False
+                        epoch, indx=epoch * len(self.train_loader) + i, log=False
                     )
-                    self.testing("angry", "neutral", epoch, ind)
                     
-
-
-            #if epoch % 1 == 0:
-            #    self.validate(
-            #        epoch, (epoch + 1) * len(self.train_loader), add_scalar=False)
+                output_dir = os.path.join(self.base_conversion_dir, "testing")
+                if not os.path.exists(output_dir):
+                    os.makedirs(output_dir)
                     
-
+                plt.figure(figsize=(10, 4))
+                sp = sp.squeeze().cpu().detach().numpy()
+                D = librosa.amplitude_to_db(np.abs(sp.T), ref=np.max)
+                librosa.display.specshow(D, sr=self.sampling_rate, hop_length=256, x_axis="time", y_axis="linear", cmap='coolwarm')
+                plt.colorbar(format='%+2.0f dB')
+                plt.title('Spectrogram')
+                plt.savefig(os.path.join(output_dir, str(epoch) + "_" + str(i) + "_spectrogram.png"))
+                plt.close()
                 
                 
 
@@ -255,10 +246,24 @@ class DiffusionPipeline:
                 f"Average training loss for epoch {epoch+1}/{self.epochs}: {avg_loss}"
             )
             comb_losses.extend(losses)
-            
 
+            if epoch % 1 == 0:
+                self.validate(
+                    epoch, (epoch + 1) * len(self.train_loader), add_scalar=False
+                )
+                self.testing("angry", "neutral", epoch)
 
-
+            if epoch % 2 == 0:
+                torch.save(
+                    {
+                        "epoch": epoch,
+                        "model_state_dict": self.model.unet.state_dict(),
+                        "optimizer_state_dict": self.optimizer.state_dict(),
+                        "loss": avg_loss,
+                    },
+                    os.path.join(self.ckpt_path, f"ckpt_test_{epoch+1}.pth"),
+                )
+                print("Model saved successfully.")
         # self.plot_losses(comb_losses)
 
     def train_step(self, batch, _class):
@@ -271,17 +276,17 @@ class DiffusionPipeline:
         )
         self.optimizer.zero_grad()
         prediction = self.model.unet(noised_image, timestep_values.float(), _class)
+        denoised_spectrogram = noised_image - prediction
         loss_value = torch.mean((noise - prediction) ** 2)
         loss_value.backward()
         self.optimizer.step()
-        return loss_value.item()
+        return loss_value.item(), denoised_spectrogram.detach()
 
     def validate(self, epoch, indx, log=True, add_scalar=True):
         with torch.no_grad():
             losses = []
             for i, (batch, _class) in enumerate(self.test_loader):
                 batch = batch.to(self.device)
-                batch = batch[:,:512,:]
                 _class = _class.to(self.device)
                 if len(batch.shape) == 3:
                     batch = batch.unsqueeze(1)
@@ -308,7 +313,7 @@ class DiffusionPipeline:
                 print(
                     f"Average test loss for epoch {epoch+1}/{self.epochs}: {avg_loss}"
                 )
-    
+
     def transforme_data(self, data, target_class):
         print("Transforming data")
         data = data.to(self.device)
@@ -317,47 +322,59 @@ class DiffusionPipeline:
         rng = torch.randint(0, 100000, (1,), device=self.device).item()
         tsrng = torch.randint(0, 100000, (1,), device=self.device).item()
         timestep_values = self.model.generate_timestamp(tsrng, data.shape[0])
-        """""
         for i in range(self.timesteps - 1):
             if i % 50 == 0:
                 timestep_va = self.model.generate_timestamp(tsrng, data.shape[0])
                 noised_data, _ = self.model.generate_noise(
                     rng, data, timestep_va.int()
                 )
-                safe_coded_spectrogram(noised_data[0][0].cpu().detach().numpy(), self.sampling_rate,  filename=f"./Diffusion/results/noise{i}.png")
-            elif i == self.timesteps - 2:
-                timestep_va = self.model.generate_timestamp(tsrng, data.shape[0])
-                noised_data, _ = self.model.generate_noise(
-                    rng, data, timestep_va.int()
-                )
-                safe_coded_spectrogram(noised_data[0][0].cpu().detach().numpy(), self.sampling_rate,  filename=f"./Diffusion/results/noise{self.timesteps}.png")
-        """""
+                save_2d_vector_as_image(noised_data[0][0].cpu().detach().numpy(), self.sampling_rate,  filename=f"./Diffusion/results/noise{i}.png")
+                
         noised_data, _ = self.model.generate_noise(
             rng, data, timestep_values.int()
-        )  # , noise_factor=0.1
+        )
 
-        # transformed_data = self.model.unet(noised_data, timestep_values.float(), target_class)  #just predicted noise for this timestep
-        # print(noised_data.shape)
-        # x  = torch.randn(1, 1, self.num_mcep+1, self.n_frames).to(self.device) #noised_data   #torch.randn(1, 1, 32, 32)  # Equivalent to tf.random.normal
         x = noised_data
 
         for i in tqdm(range(self.timesteps - 1)):
-            t = torch.tensor([self.timesteps - i - 1], dtype=torch.int32).to(
-                self.device
-            )
+            t = torch.tensor([self.timesteps - i - 1], dtype=torch.int32).to(self.device)
 
             pred_noise = self.model.unet(x, t, target_class).to(self.device)
             x = self.model.ddpm(x, pred_noise, t)
-            """""
+
             if i % 50 == 0:
-                safe_coded_spectrogram(noised_data[0][0].cpu().detach().numpy(), self.sampling_rate,  filename=f"./Diffusion/results/denoise{i}.png")
-            elif i == self.timesteps - 2:
-                safe_coded_spectrogram(noised_data[0][0].cpu().detach().numpy(), self.sampling_rate,  filename=f"./Diffusion/results/denoise{self.timesteps}.png")
-            """""
+                save_2d_vector_as_image(noised_data[0][0].cpu().detach().numpy(), self.sampling_rate,  filename=f"./Diffusion/results/denoise{i}.png")
 
         return x[0]
+    
+    
+    def reverse_diffusion(self, data, class_enc):
+        class_enc = class_enc.to(self.device)
+        x = torch.randn(data.shape[0], 1, data.shape[1], data.shape[2]).to(self.device) 
+        
+        for i in tqdm(range(self.timesteps - 1)):
+            t = torch.tensor([self.timesteps - i - 1], dtype=torch.int32).to(self.device)
+            
+            pred_noise = self.model.unet(x, t, class_enc)
 
-    def testing(self, source_emo, target_emo, epoch, indx = 0):
+
+            x = self.reverse_step(x, pred_noise, t)
+
+        print("x shape", x.shape)
+        return x[0]
+
+    def reverse_step(self, x_t, pred_noise, t):
+        alpha_t = self.model.alpha[t]
+        alpha_t_bar = self.model.alpha_bar[t]
+
+        # Compute the mean for the reverse step
+        eps_coef = (1 - alpha_t) / torch.sqrt(1 - alpha_t_bar)
+        mean = (1 / torch.sqrt(alpha_t)) * (x_t - eps_coef * pred_noise)
+
+        # No additional noise should be added during the reverse process
+        return mean
+
+    def testing(self, source_emo, target_emo, epoch):
         if target_emo not in self.sp_datasets.keys():
             raise ValueError("val_class not in dataset dictionary")
         target_emo = source_emo  # for now to test on same emotion
@@ -386,19 +403,22 @@ class DiffusionPipeline:
             f0, timeaxis, sp, ap = preprocess.world_decompose(
                 wav=wav, fs=self.sampling_rate, frame_period=self.frame_period
             )
-            
-            #split the spectrogram into :512 and the rest
-            
-            
 
-            sp_transposed = sp.T
-            sp_norm = (
-                sp_transposed - self.sps_stats["mean"]
+            coded_sp = preprocess.world_encode_spectral_envelop(
+                sp=sp, fs=self.sampling_rate, dim=self.num_mcep
+            )
+            coded_sp_transposed = coded_sp.T
+            coded_sp_norm = (
+                coded_sp_transposed - self.sps_stats["mean"]
             ) / self.sps_stats["std"]
 
-            rest_sp = sp_norm[self.sp_dim:,:]
-            input = sp_norm[:self.sp_dim,:]
-            
+            log_norm_f0 = (
+                np.log(f0 + 1e-10) - self.logf0_stats["mean"]
+            ) / self.logf0_stats["std"]
+
+            input = np.concatenate(
+                (coded_sp_norm, np.expand_dims(log_norm_f0, axis=0)), axis=0
+            )
 
             input_converted = []
             for i in range(0, input.shape[1], self.n_frames):
@@ -413,11 +433,9 @@ class DiffusionPipeline:
                 if torch.cuda.is_available():
                     segment = segment.cuda()
                 with torch.no_grad():
-                    segment_converted = self.transforme_data(
-                        segment, class_enc
-                    ).squeeze(1)
+                    #segment_converted = self.reverse_diffusion(segment, class_enc)
+                    segment_converted = self.transforme_data(segment, class_enc)
                 input_converted.append(segment_converted.cpu().detach().numpy())
-                
                 
 
             input_converted = np.concatenate(input_converted, axis=2)
@@ -428,39 +446,48 @@ class DiffusionPipeline:
                 input_converted = input_converted[:, :, :target_length]
 
             input_converted = np.squeeze(input_converted)
-            sp_converted_norm = input_converted[: self.sp_dim]
-            sp_converted_norm = np.concatenate(
-                (sp_converted_norm, rest_sp), axis=0)
-            
-            sp_converted = (
-                sp_converted_norm * self.sps_stats["std"] + self.sps_stats["mean"]
+            coded_sp_converted_norm = input_converted[: self.num_mcep]
+            f0_converted = input_converted[self.num_mcep :].squeeze(
+                0
+            )  # last element is f0_converted
+            coded_sp_converted = (
+                coded_sp_converted_norm * self.sps_stats["std"] + self.sps_stats["mean"]
             )
 
-            sp_converted = sp_converted.T
-            sp_converted = np.ascontiguousarray(
-                sp_converted, dtype=np.double
+            f0_converted_scaled = (
+                f0_converted * self.logf0_stats["std"]
+            ) + self.logf0_stats["mean"]
+            f0_converted = np.exp(f0_converted_scaled)
+
+            coded_sp_converted = coded_sp_converted.T
+            coded_sp_converted = np.ascontiguousarray(
+                coded_sp_converted, dtype=np.double
+            )
+            decoded_sp_converted = preprocess.world_decode_spectral_envelop(
+                coded_sp=coded_sp_converted, fs=self.sampling_rate
             )
 
             wav_transformed = preprocess.world_speech_synthesis(
-                f0=f0,
-                decoded_sp=sp_converted,
+                f0=f0_converted,
+                decoded_sp=decoded_sp_converted,
                 ap=ap,
                 fs=self.sampling_rate,
                 frame_period=self.frame_period,
             )
 
             sf.write(
-                file=os.path.join(output_dir, str(epoch) + '_' + str(indx) + os.path.basename(file)),
+                file=os.path.join(output_dir, str(epoch) + os.path.basename(file)),
                 data=wav_transformed,
                 samplerate=self.sampling_rate,
             )
-
+            
+            
             #visualize f0
             plt.figure()
             plt.plot(f0, label="original")
             plt.xlabel("Time")
             plt.ylabel("Frequency")
-            plt.plot(f0, label="converted")
+            plt.plot(f0_converted, label="converted")
             plt.legend()
             
             plt.savefig(os.path.join(output_dir, str(epoch) + "_" + str(0) + os.path.basename(file) + "_f0.png"))
@@ -475,7 +502,7 @@ class DiffusionPipeline:
             plt.close()
             
             plt.figure(figsize=(10, 4))
-            D = librosa.amplitude_to_db(np.abs(sp_converted.T), ref=np.max)
+            D = librosa.amplitude_to_db(np.abs(decoded_sp_converted.T), ref=np.max)
             librosa.display.specshow(D, sr=self.sampling_rate, hop_length=256, x_axis="time", y_axis="linear", cmap='coolwarm')
             plt.colorbar(format='%+2.0f dB')
             plt.title('Spectrogramconverted')
@@ -537,7 +564,7 @@ class DiffusionPipeline:
 
         for emotion in emotions:
             coded_sp_file = os.path.join(
-                cache_folder, f"sp_norm_{emotion}.pickle" #f"coded_sps_{emotion}_norm.pickle"  spectrogram is used instead of coded_sps
+                cache_folder, f"coded_sps_{emotion}_norm.pickle"  
             )
             f0_file = os.path.join(cache_folder, f"f0_norm_{emotion}.pickle")
 
@@ -555,7 +582,7 @@ class DiffusionPipeline:
         """Load the logf0 and mcep normalization statistics from the saved files and return them as dictionaries."""
 
         logf0_norm_file = os.path.join(cache_folder, "logf0s_normalization.npz")
-        sp_norm_file = os.path.join(cache_folder, "sp_normalization.npz")
+        mcep_norm_file = os.path.join(cache_folder, "mcep_normalization.npz")
 
         logf0_stats = {}
         mcep_stats = {}
@@ -569,13 +596,13 @@ class DiffusionPipeline:
                 f"logf0 normalization file not found at {logf0_norm_file}"
             )
 
-        if os.path.exists(sp_norm_file):
-            mcep_norm_data = np.load(sp_norm_file)
+        if os.path.exists(mcep_norm_file):
+            mcep_norm_data = np.load(mcep_norm_file)
             mcep_stats["mean"] = mcep_norm_data["mean"]
             mcep_stats["std"] = mcep_norm_data["std"]
         else:
             raise FileNotFoundError(
-                f"mcep normalization file not found at {sp_norm_file}"
+                f"mcep normalization file not found at {mcep_norm_file}"
             )
 
         return logf0_stats, mcep_stats
@@ -603,7 +630,7 @@ if __name__ == "__main__":
     )
 
     config_file = "./config_diff.yaml"
-    resume_training_at = './model_checkpoint/conditional_diffusion/diff_sp_run/ckpt_test_1_2199.pth'
+    resume_training_at = './model_checkpoint/conditional_diffusion/Diffusion_200_timesteps_0.02_lr_1.0e-05_testing/ckpt_test_15.pth'
 
     parser.add_argument(
         "--config_file",

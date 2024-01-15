@@ -280,6 +280,10 @@ if __name__ == "__main__":
     source_path = argv.source_path
     target_path = argv.target_path
     
+    
+    if not os.path.exists('./data/'):
+        os.makedirs('./data/')
+    
     if not os.path.exists(target_path):
         os.makedirs(target_path)
     

@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch
 import numpy as np
 
-from GAN.utils import (
+from GAN.utils_modules import (
     DownSample,
     ResidualLayer,
     GLU,

@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from GAN.transformer_torch import TransformerBlock
 
 
-from GAN.utils import (
+from GAN.utils_modules import (
     DownSample,
     upSample,
     upSample1D,
