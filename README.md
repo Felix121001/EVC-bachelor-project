@@ -25,27 +25,27 @@ IEMOCAP
 
 To reorganize the IEMOCAP dataset, run: 
 ```
-python reorganize_dataset.py --dataset_name IEMOCAP --source_path "DIR" --target_path "./data/IEMOCAP"
+python reorganize_dataset.py --dataset_name IEMOCAP --source_path "DIR" --target_path ./data/IEMOCAP
 ```
 For CREMA-D:
 ```
-python reorganize_dataset.py --dataset_name CREMA-D --source_path "DIR" --target_path "./data/CREMA-D"
+python reorganize_dataset.py --dataset_name CREMA-D --source_path "DIR" --target_path ./data/CREMA-D
 ```
 For EmoDB:
 ```
-python reorganize_dataset.py --dataset_name EmoDB --source_path "DIR" --target_path "./data/EmoDB"
+python reorganize_dataset.py --dataset_name EmoDB --source_path "DIR" --target_path ./data/EmoDB
 ```
 For EmoV-DB:
 ```
-python reorganize_dataset.py --dataset_name EmoV-DB --source_path "DIR" --target_path "./data/EmoV-DB"
+python reorganize_dataset.py --dataset_name EmoV-DB --source_path "DIR" --target_path ./data/EmoV-DB
 ```
 For RAVDESS:
 ```
-python reorganize_dataset.py --dataset_name RAVDESS --source_path "DIR" --target_path "./data/RAVDESS"
+python reorganize_dataset.py --dataset_name RAVDESS --source_path "DIR" --target_path ./data/RAVDESS
 ```
 If training is to be done with a combined dataset run:
 ```
-python reorganize_dataset.py --dataset_name combine --source_path "./data/" --target_path "./data/combined_dataset"
+python reorganize_dataset.py --dataset_name combine --source_path "./data/" --target_path ./data/combined_dataset
 ```
 ## Preprocessing 
 
