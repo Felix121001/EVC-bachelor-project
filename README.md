@@ -8,7 +8,7 @@ EmoDB: EmoDB Download
 EmoV-DB: EmoV-DB
 RAVDESS: RAVDESS on Kaggle
 
-## Preprocessing 
+## Reorganize Datasets 
 The initial preprocessing step involves categorizing all audio files from the selected dataset based on their emotion. These files are then organized into separate folders as shown below:
 ```
 IEMOCAP
@@ -33,8 +33,9 @@ For CREMA-D:
 python reorganize_dataset.py --dataset_name CREMA-D --source_path "DIR" --target_path "./data/CREMA-D"
 ```
 For EmoDB:
-
+```
 python reorganize_dataset.py --dataset_name EmoDB --source_path "DIR" --target_path "./data/EmoDB"
+```
 For EmoV-DB:
 ```
 python reorganize_dataset.py --dataset_name EmoV-DB --source_path "DIR" --target_path "./data/EmoV-DB"
@@ -47,7 +48,13 @@ If training is to be done with a combined dataset run:
 ```
 python reorganize_dataset.py --dataset_name combine --source_path "./data/" --target_path "./data/combined_dataset"
 ```
+## Preprocessing 
+
+
 The subsequent preprocessing step involves extracting F0, spectrogram, and aperiodicities, which are saved in the ./cache folder. This step is performed once to avoid repetition at the start of each training session. The default configuration file is ./config.yaml:
+```
+python preprocess_training.py --config_file ./config.yaml
+```
 
 ## Train
 To load a checkpoint the argument --resume_training can be used. To train the GAN model, use:
