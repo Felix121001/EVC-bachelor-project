@@ -10,7 +10,7 @@ RAVDESS: RAVDESS on Kaggle
 
 ## Preprocessing 
 The initial preprocessing step involves categorizing all audio files from the selected dataset based on their emotion. These files are then organized into separate folders as shown below:
-
+```
 IEMOCAP
   |- angry  
   |     |- Ses01F_impro01  
@@ -22,7 +22,7 @@ IEMOCAP
         |- Ses05F_impro02
         |- ...
   |-...
-
+```
 
 To reorganize the IEMOCAP dataset, run: 
 ```
