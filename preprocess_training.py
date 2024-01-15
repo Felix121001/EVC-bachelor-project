@@ -50,7 +50,7 @@ def split_dataset(source_dir, train_dir, test_dir, test_split):
 # python preprocess_training.py
 
 
-def preprocess_for_training(config_file="config.yaml", make_test_split=True, include_sp=True):
+def preprocess_for_training(config_file="config.yaml", make_test_split=True):
     config = load_config(config_file)
     train_dirs = config["DATASET"]["PATH"]
     cache_folder = config["DATASET"]["CACHE"]
@@ -81,12 +81,12 @@ def preprocess_for_training(config_file="config.yaml", make_test_split=True, inc
 
     all_f0s_list = []
     all_coded_sps_list = []
-    if include_sp: all_sp_list = []
+
 
 
     f0_all = {emotion: [] for emotion in emotions}
     coded_sp_all = {emotion: [] for emotion in emotions}
-    if include_sp: sp_all = {emotion: [] for emotion in emotions}
+
 
     for dataset_name, dataset_path in train_dirs.items():
         for emotion in emotions:
@@ -123,18 +123,18 @@ def preprocess_for_training(config_file="config.yaml", make_test_split=True, inc
             )
 
             transposed_coded_sps = preprocess.transpose_in_list(lst=coded_sps)
-            if include_sp: transposed_sp = preprocess.transpose_in_list(lst=sps)
+
 
             f0_all[emotion].extend(f0s)
             coded_sp_all[emotion].extend(transposed_coded_sps)
-            if include_sp: sp_all[emotion].extend(transposed_sp)
+
             all_f0s_list.extend(f0s)
             all_coded_sps_list.extend(transposed_coded_sps)
-            if include_sp: all_sp_list.extend(transposed_sp)
+
 
     f0_mean, f0_std = preprocess.logf0_statistics(all_f0s_list, log=True)
     coded_sps_mean, coded_sps_std = preprocess.coded_sp_statistics(all_coded_sps_list)
-    if include_sp: sp_mean, sp_std = preprocess.coded_sp_statistics(all_sp_list)
+
 
     for emotion in emotions:
         f0s_log = [np.ma.log(f0) for f0 in f0_all[emotion]]
@@ -146,9 +146,7 @@ def preprocess_for_training(config_file="config.yaml", make_test_split=True, inc
             (coded_sps_transposed - coded_sps_mean) / coded_sps_std
             for coded_sps_transposed in coded_sp_all[emotion]
         ]
-        if include_sp: sp_all[emotion] = [
-            (sp_transposed - sp_mean) / sp_std for sp_transposed in sp_all[emotion]
-        ]
+
 
         save_pickle(
             variable=coded_sp_all[emotion],
@@ -165,10 +163,6 @@ def preprocess_for_training(config_file="config.yaml", make_test_split=True, inc
             std=f0_std_emotion
         )
         
-        if include_sp: save_pickle(
-            variable=sp_all[emotion],
-            fileName=os.path.join(cache_folder, f"sp_norm_{emotion}.pickle"),
-        )
 
     np.savez(
         os.path.join(cache_folder, "logf0s_normalization.npz"), mean=f0_mean, std=f0_std
@@ -177,11 +171,6 @@ def preprocess_for_training(config_file="config.yaml", make_test_split=True, inc
         os.path.join(cache_folder, "coded_sp_normalization.npz"),
         mean=coded_sps_mean,
         std=coded_sps_std,
-    )
-    if include_sp: np.savez(
-        os.path.join(cache_folder, "sp_normalization.npz"),
-        mean=sp_mean,
-        std=sp_std,
     )
 
     end_time = time.time()

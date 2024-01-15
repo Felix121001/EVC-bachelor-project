@@ -897,7 +897,7 @@ class CycleGANTraining(object):
         """Load the logf0 and mcep normalization statistics from the saved files and return them as dictionaries."""
 
         logf0_norm_file = os.path.join(cache_folder, "logf0s_normalization.npz")
-        mcep_norm_file = os.path.join(cache_folder, "mcep_normalization.npz")
+        mcep_norm_file = os.path.join(cache_folder, "coded_sp_normalization.npz")
 
         logf0_stats = {}
         mcep_stats = {}

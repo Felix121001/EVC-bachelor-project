@@ -4,10 +4,10 @@ MODEL:
   GATED_CONV: True
 
 DATASET: 
-  PATH: {"IEMOCAP" : "./data/IEMOCAP", "CREMA-D" : "./data/CREMA-D", "EmoDB" : "./data/EmoDB", "EmoV-DB" : "./data/EmoV-DB", "RAVDESS" : "./data/RAVDESS"}
-  TRAINING_DATASET: "./data/combined_dataset/"
+  PATH: {"IEMOCAP" : "./data/IEMOCAP"} #, "CREMA-D" : "./data/CREMA-D", "EmoDB" : "./data/EmoDB", "EmoV-DB" : "./data/EmoV-DB", "RAVDESS" : "./data/RAVDESS"}
+  TRAINING_DATASET: "./data/IEMOCAP/"
   EMOTIONS: ["angry", "neutral", "happy", "sad"]
-  CACHE: "./cache/combined/"
+  CACHE: "./cache/IEMOCAP/"
   VAL_SPLIT: 0.01
   TEST_SPLIT: 0.01
 
