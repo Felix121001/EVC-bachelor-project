@@ -1,0 +1,44 @@
+MODEL:
+  ARCHITECTURE_G: "SeperatePathwayGenerator"
+  ARCHITECTURE_D: "Discriminator"
+  GATED_CONV: True
+
+DATASET: 
+  PATH: {"IEMOCAP" : "./data/IEMOCAP", "CREMA-D" : "./data/CREMA-D", "EmoDB" : "./data/EmoDB", "EmoV-DB" : "./data/EmoV-DB", "RAVDESS" : "./data/RAVDESS"}
+  TRAINING_DATASET: "./data/combined_dataset/"
+  EMOTIONS: ["angry", "neutral", "happy", "sad"]
+  CACHE: "./cache/combined/"
+  VAL_SPLIT: 0.01
+  TEST_SPLIT: 0.01
+
+INPUT:
+  N_FRAMES: 384 #256
+  NUM_MCEP: 32
+  SAMPLING_RATE: 16000
+  FRAME_PERIOD: 5.0
+
+SOLVER:
+  RUN_NAME: "SeperatePathwayGenerator_run"
+  OPTIMIZER: "adam"
+  LR_G: 0.0002
+  LR_D: 0.0001
+  MAX_EPOCHS: 20
+  BATCH_SIZE: 16
+  CYCLE_LOSS_LAMBDA: 5
+  IDENTITY_LOSS_LAMBDA: 3
+  EMOTION_LOSS_LAMBDA: 2
+  TV_LOSS_LAMBDA: 0
+  FEATURE_MATCHING_LOSS_LAMBDA: 0
+  CHECKPOINT_DIR: "./model_checkpoint/"
+  TRAIN_CLASSIFIER: False
+  USE_F0_MODEL: False
+  CHECKPOINT_DIR_CLASSIFIER: "./model_checkpoint/classifier/"
+  CHECKPOINT_INTERVAL: 1
+  TESTING_INTERVAL: 1
+  LOG_INTERVAL: 2
+  LOG_TS_BOARD_INTERVAL: 200
+  START_LR_DECAY: 20000
+  MIN_LR: 0.000001
+  LR_DECAY_ITER: 10000
+
+  #tensorboard --logdir runs
