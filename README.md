@@ -13,10 +13,9 @@ The initial preprocessing step involves categorizing all audio files from the se
 ```
 IEMOCAP
   |- angry  
-  |     |- Ses01F_impro01  
-  |     |- Ses01F_impro02  
-  |     |- ...  
-  |- ...
+        |- Ses01F_impro01  
+        |- Ses01F_impro02  
+        |- ...  
   |- happy
         |- Ses05F_impro01
         |- Ses05F_impro02
