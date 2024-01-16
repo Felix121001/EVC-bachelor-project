@@ -1,12 +1,28 @@
 ## About This Project
 This repository hosts the code for the bachelor project titled "Exploring Cycle GAN & Diffusion Models in the Context of Emotional Voice Conversion."
 
-The primary dataset used for this project is IEMOCAP, which requires signing in to access at: IEMOCAP. Additionally, the project is compatible with other datasets, such as:
+The primary dataset used in this project is IEMOCAP, which requires signing in to access: [IEMOCAP](https://sail.usc.edu/iemocap/). Additionally, the project is compatible with other datasets, such as:
+- CREMA-D: [CREMA-D Repository](https://github.com/CheyneyComputerScience/CREMA-D)
+- EmoDB: [EmoDB Download](http://www.emodb.bilderbar.info/download/)
+- EmoV-DB: [EmoV-DB](https://www.openslr.org/115/)
+- RAVDESS: [RAVDESS on Kaggle](https://www.kaggle.com/uwrfkaggler/ravdess-emotional-speech-audio)
 
-CREMA-D: CREMA-D Repository
-EmoDB: EmoDB Download
-EmoV-DB: EmoV-DB
-RAVDESS: RAVDESS on Kaggle
+
+The config.yaml (for the GAN model) or config_diff.yaml (for the Diffusion model) can be edited to change various settings, such as hyperparameters for training, dataset choices, emotion domains to be learned, etc.
+
+## Requirements
+Below are the package versions of the most crucial libraries used on python 3.11:
+
+torchaudio=2.1.1+cu121 
+torchvision=0.16.1+cu121 
+numpy=1.26.2 
+scipy=1.11.4 
+librosa=0.10.1
+soundfile=0.12.1 
+matplotlib=3.8.2 
+scikit-learn=1.3.2 
+tensorboard=2.15.1 
+pyworld=0.3.4
 
 ## Reorganize Datasets 
 The initial preprocessing step involves categorizing all audio files from the selected dataset based on their emotion. These files are then organized into separate folders as shown below:
