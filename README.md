@@ -82,12 +82,12 @@ To train Diffusion model, use:
 ```
 pyhton train_diff.py --config_file ./config_diff.yaml
 ```
-To resume training at checkpoints add argument:
+To resume training at checkpoint add argument:
 ```
 --resume_training <DIR>
 ```
 ## Results from training
-If TensorBoard is installed the loss during training can be visualized through the command:
+If TensorBoard is installed the loss during training can be visualized by the command:
 ```
 tensorboard --logdir runs
 ```
