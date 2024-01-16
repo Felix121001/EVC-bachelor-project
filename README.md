@@ -14,16 +14,16 @@ The config.yaml (for the GAN model) or config_diff.yaml (for the Diffusion model
 Below are the package versions of the most crucial libraries used on python 3.11:
 
 
--torchaudio=2.1.1+cu121 
--torchvision=0.16.1+cu121 
--numpy=1.26.2 
--scipy=1.11.4 
--librosa=0.10.1
--soundfile=0.12.1 
--matplotlib=3.8.2 
--scikit-learn=1.3.2 
--tensorboard=2.15.1 
--pyworld=0.3.4
+- torchaudio=2.1.1+cu121 
+- torchvision=0.16.1+cu121 
+- numpy=1.26.2 
+- scipy=1.11.4 
+- librosa=0.10.1
+- soundfile=0.12.1 
+- matplotlib=3.8.2 
+- scikit-learn=1.3.2 
+- tensorboard=2.15.1 
+- pyworld=0.3.4
 
 
 ## Reorganize Datasets 
