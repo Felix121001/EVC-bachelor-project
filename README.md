@@ -92,6 +92,9 @@ If TensorBoard is installed the loss during training can be visualized by the co
 tensorboard --logdir runs
 ```
 
+## Sample audio 
+https://drive.google.com/drive/folders/1rBCzFABLYlOes8kA2VZE7rxghZFVjI5w?usp=drive_link
+
 
 
 
